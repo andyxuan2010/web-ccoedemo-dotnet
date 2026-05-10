@@ -1,0 +1,11 @@
+@model AuthErrorViewModel
+@{
+    ViewData["Title"] = "Authentication Error";
+}
+<h1>Authentication failed</h1>
+<p><strong>@Model.Error</strong></p>
+<p>@Model.ErrorDescription</p>
+
+<div class="actions">
+    <a class="button secondary" href="@Url.Action("Index", "Home")">Back home</a>
+</div>

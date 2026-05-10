@@ -1,0 +1,113 @@
+@model ProfileViewModel
+@{
+    ViewData["Title"] = "Profile | AAD SSO Demo";
+    var name = Model.User.GetValueOrDefault("name", "n/a");
+    var username = Model.User.GetValueOrDefault("preferred_username", "n/a");
+    var tenant = Model.User.GetValueOrDefault("tid", "n/a");
+    var objectId = Model.User.GetValueOrDefault("oid", "n/a");
+    var email = Model.User.GetValueOrDefault("email");
+    if (string.IsNullOrWhiteSpace(email))
+    {
+        email = username;
+    }
+
+    if (string.IsNullOrWhiteSpace(email))
+    {
+        email = "n/a";
+    }
+
+    var authType = Model.User.GetValueOrDefault("authentication_type", "n/a");
+    var authTypeClass = authType.Contains("aad", StringComparison.OrdinalIgnoreCase) ? "auth-type-alert" : string.Empty;
+}
+<div class="profile-head">
+    <span class="section-kicker">User Context</span>
+    <h1>Signed-in profile</h1>
+</div>
+<p><strong>Authentication mode:</strong> @Model.AuthMode</p>
+
+@if (Model.TenantBadges.Count > 0 || Model.RoleBadges.Count > 0)
+{
+    <div class="identity-badges">
+        @foreach (var tenantBadge in Model.TenantBadges)
+        {
+            <span class="info-badge tenant-badge">Tenant: @tenantBadge</span>
+        }
+        @foreach (var roleBadge in Model.RoleBadges)
+        {
+            <span class="info-badge role-badge">@roleBadge</span>
+        }
+    </div>
+}
+
+<dl>
+    <dt>Name</dt>
+    <dd>@name</dd>
+
+    <dt>Username</dt>
+    <dd>@username</dd>
+
+    <dt>Tenant</dt>
+    <dd>@tenant</dd>
+
+    <dt>Object ID</dt>
+    <dd>@objectId</dd>
+
+    <dt>Email</dt>
+    <dd>@email</dd>
+
+    <dt>Authentication Type</dt>
+    <dd class="@authTypeClass">@authType</dd>
+</dl>
+
+<ul class="meta-list">
+    <li>
+        <strong>Display Name</strong>
+        @name
+    </li>
+    <li>
+        <strong>Principal</strong>
+        @username
+    </li>
+    <li>
+        <strong>Tenant</strong>
+        @tenant
+    </li>
+    <li>
+        <strong>Object ID</strong>
+        @objectId
+    </li>
+</ul>
+
+<details class="claims">
+    <summary>All Available Claims</summary>
+    @if (Model.ClaimItems.Count > 0)
+    {
+        <input id="claimsFilterInput" class="claims-filter-input" type="search" placeholder="Filter claims by name or value">
+        <dl id="claimsList">
+            @foreach (var claim in Model.ClaimItems)
+            {
+                <dt class="claim-key">@claim.Key</dt>
+                <dd class="claim-value">
+                    <span class="claim-text">@claim.Value</span>
+                    <button type="button" class="button secondary tiny claim-copy-button" data-claim-value="@claim.Value">Copy</button>
+                </dd>
+            }
+        </dl>
+    }
+    else
+    {
+        <p>No additional claims available for this authentication mode.</p>
+    }
+</details>
+
+<div class="actions">
+    <a class="button secondary" href="@Url.Action("Index", "Home")">Home</a>
+    @if (string.Equals(Model.AuthMode, "Easy Auth", StringComparison.Ordinal))
+    {
+        <a class="button primary" href="@Url.Action("LogoutEasyAuth", "Home")">Sign out</a>
+    }
+    else
+    {
+        <a class="button primary" href="@Url.Action("LogoutMsal", "Home")">Sign out</a>
+    }
+</div>
