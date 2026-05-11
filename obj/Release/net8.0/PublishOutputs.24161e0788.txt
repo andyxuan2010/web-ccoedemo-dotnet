@@ -1,0 +1,13 @@
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\WebCcoeDemo.Web.exe
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\NuGet.config
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\web.config
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\WebCcoeDemo.Web.dll
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\WebCcoeDemo.Web.deps.json
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\WebCcoeDemo.Web.runtimeconfig.json
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\WebCcoeDemo.Web.pdb
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\Microsoft.Identity.Client.dll
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\Microsoft.IdentityModel.Abstractions.dll
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\Microsoft.IdentityModel.JsonWebTokens.dll
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\Microsoft.IdentityModel.Logging.dll
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\Microsoft.IdentityModel.Tokens.dll
+N:\home\administrator\Documents\GitHub\CCOE-Azure\IaC\web-ccoedemo-dotnet\.codex-publish-validate\System.IdentityModel.Tokens.Jwt.dll
