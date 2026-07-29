@@ -1,0 +1,133 @@
+name: $(Build.Repository.Name)
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: IaC/template
+      ref: refs/heads/main
+
+pool:
+  name: "Azure Pipelines"
+  vmImage: "ubuntu-latest"
+
+variables:
+  - name: env
+    value: "prod"
+  - name: projectFile
+    value: "WebCcoeDemo.Web.csproj"
+  - name: buildConfiguration
+    value: "Release"
+  - name: webAppNameSecondary
+    value: ""
+  - name: webAppNameThird
+    value: ""
+  - name: publishDir
+    value: "$(Build.ArtifactStagingDirectory)/publish"
+  - name: packagePath
+    value: "$(Build.ArtifactStagingDirectory)/app.zip"
+  - name: dotnetSdkVersion
+    value: "8.0.x"
+  - name: linuxDotnetRuntimeStack
+    value: "DOTNETCORE|8.0"
+
+stages:
+  - stage: Build
+    displayName: Build
+    jobs:
+      - job: Build
+        displayName: Build package
+        steps:
+          - template: templates/shared-runner-hygiene.yml@templates
+            parameters:
+              configureNuGetCache: true
+              runPostJobCleanup: false
+
+          - checkout: self
+            clean: true
+            persistCredentials: false
+
+          - task: UseDotNet@2
+            displayName: Install .NET 8 SDK
+            inputs:
+              packageType: sdk
+              version: "$(dotnetSdkVersion)"
+
+          - task: DotNetCoreCLI@2
+            displayName: Restore
+            inputs:
+              command: restore
+              projects: "$(projectFile)"
+              feedsToUse: config
+              nugetConfigPath: NuGet.config
+
+          - script: dotnet list "$(projectFile)" package --vulnerable --include-transitive
+            displayName: Audit NuGet dependencies
+
+          - task: DotNetCoreCLI@2
+            displayName: Build with analyzers
+            inputs:
+              command: build
+              projects: "$(projectFile)"
+              arguments: "--configuration $(buildConfiguration) --no-restore"
+
+          - task: DotNetCoreCLI@2
+            displayName: Publish
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: "$(projectFile)"
+              arguments: "--configuration $(buildConfiguration) --output $(publishDir)"
+              modifyOutputPath: false
+              zipAfterPublish: false
+
+          - task: ArchiveFiles@2
+            displayName: Archive application
+            inputs:
+              rootFolderOrFile: "$(publishDir)"
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: "$(packagePath)"
+              replaceExistingArchive: true
+
+          - script: |
+              set -euo pipefail
+              unzip -l "$(packagePath)" | awk '{print $4}' | grep -x "web.config" > /dev/null
+            displayName: Validate package root contains web.config
+
+          - publish: "$(packagePath)"
+            displayName: Publish artifact
+            artifact: drop
+
+          - template: templates/shared-runner-hygiene.yml@templates
+            parameters:
+              runInitialization: false
+              runPreJobCleanup: false
+              runCachePrep: false
+
+  - template: azure-pipelines/deploy-stage.yml
+    parameters:
+      stageName: DeploySandbox
+      displayName: Deploy Sandbox
+      dependsOn: Build
+      azureServiceConnection: sc-platform-sbx
+      webAppNamePrimary: web-platform-cc-sbx-dotnet
+
+  - template: azure-pipelines/deploy-stage.yml
+    parameters:
+      stageName: DeployDev
+      displayName: Deploy Dev
+      dependsOn: DeploySandbox
+      azureServiceConnection: sc-platform-dev
+      webAppNamePrimary: web-platform-eus-dev-dotnet

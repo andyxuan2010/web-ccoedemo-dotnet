@@ -1,0 +1,8 @@
+# Require repository-owner review for delivery and security-sensitive changes.
+/.github/ @andyxuan2010
+/azure-pipelines.yml @andyxuan2010
+/azure-pipelines/ @andyxuan2010
+/run_from_package.yml @andyxuan2010
+/NuGet.config @andyxuan2010
+/Services/AuthDemoService.cs @andyxuan2010
+/Controllers/HomeController.cs @andyxuan2010
