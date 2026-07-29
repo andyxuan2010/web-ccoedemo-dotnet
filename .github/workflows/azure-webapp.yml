@@ -80,7 +80,7 @@ jobs:
       branch_name: ${{ steps.context.outputs.branch_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Resolve branch context
         id: context
@@ -142,7 +142,7 @@ jobs:
       release_notes: ${{ steps.semver.outputs.release_notes }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -233,7 +233,7 @@ jobs:
       deploy_branch: ${{ steps.context.outputs.branch_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Resolve branch context
         id: context
@@ -543,7 +543,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -615,7 +615,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
