@@ -1,0 +1,31 @@
+parameters:
+  - name: stageName
+    type: string
+  - name: displayName
+    type: string
+  - name: dependsOn
+    type: string
+  - name: azureServiceConnection
+    type: string
+  - name: environmentName
+    type: string
+  - name: webAppNamePrimary
+    type: string
+  - name: sourceBranch
+    type: string
+
+stages:
+  - template: templates/webapp-deploy-stage.yml@templates
+    parameters:
+      stageName: ${{ parameters.stageName }}
+      displayName: ${{ parameters.displayName }}
+      dependsOn: ${{ parameters.dependsOn }}
+      azureServiceConnection: ${{ parameters.azureServiceConnection }}
+      environmentName: ${{ parameters.environmentName }}
+      webAppNamePrimary: ${{ parameters.webAppNamePrimary }}
+      webAppNameSecondary: $(webAppNameSecondary)
+      sourceBranch: ${{ parameters.sourceBranch }}
+      stack: dotnet
+      linuxRuntimeStack: $(linuxDotnetRuntimeStack)
+      deploymentMode: remoteBuild
+      healthPath: /healthz
