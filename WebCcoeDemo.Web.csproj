@@ -9,7 +9,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.87.0" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.90.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
   </ItemGroup>
   <ItemGroup>
