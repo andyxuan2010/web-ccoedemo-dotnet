@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-09-18T03:14:40Z",
+  "documents": [
+    "docs/aadsso.md",
+    "docs/ARCHITECTURE.md",
+    "docs/DEPLOYMENT_METHODS.md",
+    "docs/PIPELINE.md",
+    "README.md",
+    "SECURITY.md"
+  ]
+}
