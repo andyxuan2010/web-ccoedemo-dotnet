@@ -1,0 +1,73 @@
+name: Build and Publish Container Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-pull-request:
+    name: Build Container Image (Pull Request)
+    if: github.event_name == 'pull_request' && (github.repository == 'CCOE-Azure/web-ccoedemo-dotnet' || github.repository == 'andyxuan2010/web-ccoedemo-dotnet')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          image_name="${IMAGE_NAME,,}"
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "local/${image_name}:${GITHUB_SHA}" \
+            --load \
+            .
+
+  publish-main:
+    name: Build and Publish Container Image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (github.repository == 'CCOE-Azure/web-ccoedemo-dotnet' || github.repository == 'andyxuan2010/web-ccoedemo-dotnet')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GitHub Container Registry
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${GH_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Build and push image
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${IMAGE_NAME,,}"
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "${image}:${GITHUB_SHA}" \
+            --tag "${image}:latest" \
+            --push \
+            .
