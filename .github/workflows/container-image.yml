@@ -1,0 +1,98 @@
+name: Build and Publish Container Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  container-image-gate:
+    name: Container Image Workflow Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
+    steps:
+      - name: Evaluate IS_ORIGIN
+        id: gate
+        shell: bash
+        env:
+          IS_ORIGIN: ${{ vars.IS_ORIGIN }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${IS_ORIGIN,,}" == "true" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+            echo "Container image workflow is enabled."
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Container image workflow is disabled; set IS_ORIGIN=true in the origin repository."
+          fi
+
+  build-pull-request:
+    name: Build Container Image (Pull Request)
+    needs: container-image-gate
+    if: needs.container-image-gate.outputs.enabled == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          image_name="${IMAGE_NAME,,}"
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "local/${image_name}:${GITHUB_SHA}" \
+            --load \
+            .
+
+  publish-main:
+    name: Build and Publish Container Image
+    needs: container-image-gate
+    if: needs.container-image-gate.outputs.enabled == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GitHub Container Registry
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${GH_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Build and push image
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${IMAGE_NAME,,}"
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "${image}:${GITHUB_SHA}" \
+            --tag "${image}:latest" \
+            --push \
+            .
