@@ -1,0 +1,159 @@
+parameters:
+  - name: deploymentEnvironment
+    displayName: Deployment environment
+    type: string
+    default: dev
+    values:
+      - sbx
+      - dev
+      - prod
+  - name: webAppNamePrimary
+    displayName: Primary App Service override (required for prod)
+    type: string
+    default: ""
+  - name: webAppNameSecondary
+    type: string
+    default: ""
+  - name: webAppNameThird
+    type: string
+    default: ""
+
+trigger:
+  branches:
+    include:
+      - none
+
+
+pr:
+  branches:
+    include:
+      - none
+
+resources:
+  repositories:
+    - repository: tf_tpl
+      type: git
+      name: IaC/template
+      ref: refs/heads/main
+
+pool:
+  name: "IaCRunner"
+  demands:
+    - Agent.OS -equals Linux
+
+variables:
+  - name: env
+    value: ${{ parameters.deploymentEnvironment }}
+  - name: subscription
+    ${{ if eq(parameters.deploymentEnvironment, 'prod') }}:
+      value: "prod"
+    ${{ if eq(parameters.deploymentEnvironment, 'dev') }}:
+      value: "nonprod"
+    ${{ if eq(parameters.deploymentEnvironment, 'sbx') }}:
+      value: "sbx"
+  - name: azureServiceConnection
+    value: "sc-ccoe-iac-devops-${{ variables.subscription }}"
+  - name: webAppNamePrimary
+    ${{ if ne(parameters.webAppNamePrimary, '') }}:
+      value: ${{ parameters.webAppNamePrimary }}
+    ${{ elseif eq(parameters.deploymentEnvironment, 'dev') }}:
+      value: "web-platform-eus-dev-dotnet"
+    ${{ elseif eq(parameters.deploymentEnvironment, 'sbx') }}:
+      value: "web-platform-cc-sbx-dotnet"
+    ${{ else }}:
+      value: ""
+  - name: webAppNameSecondary
+    value: ${{ parameters.webAppNameSecondary }}
+  - name: webAppNameThird
+    value: ${{ parameters.webAppNameThird }}
+  - name: projectFile
+    value: "WebCcoeDemo.Web.csproj"
+  - name: buildConfiguration
+    value: "Release"
+  - name: publishDir
+    value: "$(Build.ArtifactStagingDirectory)/publish"
+  - name: packagePath
+    value: "$(Build.ArtifactStagingDirectory)/app.zip"
+  - name: dotnetSdkVersion
+    value: "8.0.x"
+  - name: linuxDotnetRuntimeStack
+    value: "DOTNETCORE|8.0"
+
+stages:
+  - stage: Build
+    displayName: Build
+    jobs:
+      - job: Build
+        displayName: Build self-contained package
+        steps:
+          - template: templates/shared-runner-hygiene.yml@tf_tpl
+            parameters:
+              configureNuGetCache: true
+              runPostJobCleanup: false
+
+          - checkout: self
+            clean: true
+            persistCredentials: false
+
+          - task: UseDotNet@2
+            displayName: Install .NET 8 SDK
+            inputs:
+              packageType: sdk
+              version: "$(dotnetSdkVersion)"
+
+          - task: DotNetCoreCLI@2
+            displayName: Restore
+            inputs:
+              command: restore
+              projects: "$(projectFile)"
+              feedsToUse: config
+              nugetConfigPath: NuGet.config
+
+          - task: DotNetCoreCLI@2
+            displayName: Publish
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: "$(projectFile)"
+              arguments: "--configuration $(buildConfiguration) --output $(publishDir)"
+              modifyOutputPath: false
+              zipAfterPublish: false
+
+          - task: ArchiveFiles@2
+            displayName: Archive application package
+            inputs:
+              rootFolderOrFile: "$(publishDir)"
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: "$(packagePath)"
+              replaceExistingArchive: true
+
+          - script: |
+              set -euo pipefail
+              unzip -l "$(packagePath)" | awk '{print $4}' | grep -x "web.config" > /dev/null
+            displayName: Validate package root contains web.config
+
+          - publish: "$(packagePath)"
+            displayName: Publish artifact
+            artifact: drop
+
+          - template: templates/shared-runner-hygiene.yml@tf_tpl
+            parameters:
+              runInitialization: false
+              runPreJobCleanup: false
+              runCachePrep: false
+
+  - template: templates/webapp-deploy-stage.yml@tf_tpl
+    parameters:
+      stageName: Deploy
+      displayName: Deploy
+      dependsOn: Build
+      azureServiceConnection: $(azureServiceConnection)
+      environmentName: ${{ format('webapp-dotnet-{0}', parameters.deploymentEnvironment) }}
+      webAppNamePrimary: $(webAppNamePrimary)
+      webAppNameSecondary: $(webAppNameSecondary)
+      webAppNameThird: $(webAppNameThird)
+      stack: dotnet
+      linuxRuntimeStack: $(linuxDotnetRuntimeStack)
+      deploymentMode: runFromPackage
+      healthPath: /health

@@ -1,0 +1,321 @@
+@using WebCcoeDemo.Web.Models
+@{
+    var activeAuthModes = (ViewBag.ActiveAuthModes as List<string>) ?? new List<string>();
+    var isSignedIn = (bool?)(ViewBag.IsSignedIn) ?? false;
+    var cacheToken = (string?)(ViewBag.CacheToken) ?? string.Empty;
+    var appServicePortalUrl = (string?)(ViewBag.AppServicePortalUrl) ?? string.Empty;
+    var appRegistrationPortalUrl = (string?)(ViewBag.AppRegistrationPortalUrl) ?? string.Empty;
+    var sessionTimeline = (ViewBag.SessionTimeline as List<TimelineEvent>) ?? new List<TimelineEvent>();
+    var authHealth = (ViewBag.AuthHealth as List<AuthHealthItem>) ?? new List<AuthHealthItem>();
+    var authHealthReady = (bool?)(ViewBag.AuthHealthReady) ?? false;
+    var runtimeInfo = (ViewBag.RuntimeInfo as List<KeyValuePair<string, string>>) ?? new List<KeyValuePair<string, string>>();
+    ViewData["Title"] ??= "AAD SSO Demo";
+}
+<!doctype html>
+<html lang="en" data-theme="cloud">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"]</title>
+    <script>
+        (function () {
+            try {
+                document.documentElement.dataset.theme = localStorage.getItem("identity-demo-theme") === "classic" ? "classic" : "cloud";
+                document.documentElement.lang = localStorage.getItem("identity-demo-language") === "fr" ? "fr" : "en";
+            } catch (_) { }
+        })();
+    </script>
+    <link rel="stylesheet" href="@Url.Content("~/css/shared-ui.css")?v=@cacheToken">
+</head>
+<body>
+    <div class="scroll-progress" id="scrollProgress"></div>
+    <div class="firework-layer" id="fireworkLayer"></div>
+    <header class="site-banner">
+            <a class="brand" href="@Url.Action("Index", "Home")" aria-label="Identity Demo home">
+                <span class="brand-mark" aria-hidden="true">ID</span>
+                <span class="brand-copy"><strong>Identity Demo</strong><small>Microsoft Entra ID</small></span>
+            </a>
+            <div class="banner-actions">
+            <nav class="banner-primary-actions" aria-label="Application actions">
+            <a class="banner-link" href="@Url.Action("Index", "Home")" data-i18n="nav.home">Home</a>
+            <button class="banner-link" type="button" onclick="refreshLatest()" data-i18n="nav.refresh">Refresh Latest</button>
+            @if (isSignedIn) {
+            <a class="banner-link" href="@appServicePortalUrl" target="_blank" rel="noopener noreferrer">App Service</a>
+            <a class="banner-link" href="@appRegistrationPortalUrl" target="_blank" rel="noopener noreferrer" data-i18n="nav.registration">App Registration</a>
+            } else {
+            <a class="banner-link disabled" href="#" aria-disabled="true" tabindex="-1">App Service</a>
+            <a class="banner-link disabled" href="#" aria-disabled="true" tabindex="-1" data-i18n="nav.registration">App Registration</a>
+            }
+            </nav>
+                <button class="theme-switch" id="themeSwitch" type="button" aria-pressed="false">
+                    <span class="theme-switch-icon" aria-hidden="true">◐</span>
+                    <span class="theme-switch-label">Cloud</span>
+                </button>
+                <div class="language-switch" role="group" aria-label="Language">
+                    <button class="language-option active" type="button" data-language="en" aria-pressed="true">EN</button>
+                    <span aria-hidden="true">/</span>
+                    <button class="language-option" type="button" data-language="fr" aria-pressed="false">FR</button>
+                </div>
+            </div>
+    </header>
+    <main class="shell">
+        <div class="layout">
+            <section class="card">
+                @RenderBody()
+            </section>
+
+            <aside class="side-panel">
+                @if (activeAuthModes.Count > 0) {
+                <div class="auth-row">
+                    <div class="auth-badge active">
+                        <span class="label" data-i18n="panel.activeAuth">Active auth:</span>
+                        @foreach (var mode in activeAuthModes) {
+                        <span class="mode-pill @mode.ToLowerInvariant().Replace(" ", "-")">@mode</span>
+                        }
+                    </div>
+                    <div class="auth-actions">
+                        @if (activeAuthModes.Contains("MSAL")) {
+                        <a class="button primary tiny" href="@Url.Action("LogoutMsal", "Home")" data-i18n="action.signout">Sign out</a>
+                        }
+                        @if (activeAuthModes.Contains("Easy Auth")) {
+                        <a class="button primary tiny" href="@Url.Action("LogoutEasyAuth", "Home")" data-i18n="action.signout">Sign out</a>
+                        }
+                    </div>
+                </div>
+                } else {
+                <div class="auth-badge">
+                    <span class="label" data-i18n="panel.activeAuth">Active auth:</span>
+                    <span class="mode-pill" data-i18n="panel.notSignedIn">Not signed in</span>
+                </div>
+                }
+                <h2 data-i18n="identity.kicker">Identity Demo</h2>
+                <p data-i18n="panel.description">Demo branding panel for identity mode validation</p>
+                <div class="live-metrics">
+                    <div class="metric-label" data-i18n="panel.localTime">Local Time</div>
+                    <div class="metric-value" id="liveClock">--:--:--</div>
+                    <div class="metric-label" style="margin-top: 8px;" data-i18n="panel.date">Date</div>
+                    <div class="metric-value" id="liveDate">---</div>
+                </div>
+                @if (runtimeInfo.Count > 0) {
+                <div class="panel-body">
+                    <ul class="meta-list runtime-list">
+                        @foreach (var item in runtimeInfo) {
+                        <li>
+                            <strong>@item.Key:</strong>
+                            <span>@item.Value</span>
+                        </li>
+                        }
+                    </ul>
+                </div>
+                }
+                @if (isSignedIn) {
+                <div class="idle-timer">
+                    <div class="metric-label" data-i18n="panel.autoSignout">Auto Sign-out</div>
+                    <div class="metric-value" id="idleCountdown">05:00</div>
+                </div>
+                }
+                <details class="health-panel">
+                    <summary data-i18n="panel.authHealth">Auth Health</summary>
+                    <div class="panel-body">
+                        <ul class="health-list">
+                            @foreach (var item in authHealth) {
+                            <li class="health-row">
+                                <span class="status-dot @(item.Ok ? "ok" : "")" aria-hidden="true"></span>
+                                <span>
+                                    <strong>@item.Name</strong>
+                                    <span class="health-value"> - @item.Value</span>
+                                </span>
+                            </li>
+                            }
+                        </ul>
+                        <div class="health-summary">
+                            @if (authHealthReady) {
+                                <text><span data-i18n="panel.ready">Core auth configuration is ready.</span></text>
+                            } else {
+                                <text><span data-i18n="panel.attention">At least one auth setting still needs attention.</span></text>
+                            }
+                        </div>
+                    </div>
+                </details>
+                <details class="timeline-panel">
+                    <summary data-i18n="panel.timeline">Session Timeline</summary>
+                    <div class="panel-body">
+                        @if (sessionTimeline.Count > 0) {
+                        <ul class="timeline-list">
+                            @foreach (var eventItem in sessionTimeline.Take(8)) {
+                            <li class="timeline-item">
+                                <div class="timeline-event">@eventItem.Event</div>
+                                <div class="timeline-meta">
+                                    @if (!string.IsNullOrWhiteSpace(eventItem.Mode)) {
+                                    <span class="timeline-mode">@eventItem.Mode</span>
+                                    }
+                                    <span class="timeline-at">@eventItem.At</span>
+                                </div>
+                            </li>
+                            }
+                        </ul>
+                        } else {
+                        <p data-i18n="panel.noEvents">No session events yet.</p>
+                        }
+                    </div>
+                </details>
+            </aside>
+        </div>
+    </main>
+    <script src="@Url.Content("~/js/site.js")?v=@cacheToken"></script>
+    <script>
+        (function () {
+            const progress = document.getElementById("scrollProgress");
+            const clock = document.getElementById("liveClock");
+            const date = document.getElementById("liveDate");
+            const fireworkLayer = document.getElementById("fireworkLayer");
+            const idleCountdown = document.getElementById("idleCountdown");
+            const idleLimitMs = 5 * 60 * 1000;
+            let idleDeadline = Date.now() + idleLimitMs;
+
+            function updateProgress() {
+                const top = document.documentElement.scrollTop || document.body.scrollTop;
+                const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+                const percent = height > 0 ? (top / height) * 100 : 0;
+                progress.style.width = percent + "%";
+            }
+
+            function updateTime() {
+                const now = new Date();
+                clock.textContent = now.toLocaleTimeString();
+                date.textContent = now.toLocaleDateString(undefined, {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                });
+            }
+
+            updateProgress();
+            updateTime();
+            window.addEventListener("scroll", updateProgress, { passive: true });
+            setInterval(updateTime, 1000);
+
+            if (idleCountdown) {
+                function formatMs(ms) {
+                    const totalSec = Math.max(0, Math.ceil(ms / 1000));
+                    const m = Math.floor(totalSec / 60);
+                    const s = totalSec % 60;
+                    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+                }
+
+                function resetIdleDeadline() {
+                    idleDeadline = Date.now() + idleLimitMs;
+                }
+
+                function tickIdle() {
+                    const remaining = idleDeadline - Date.now();
+                    idleCountdown.textContent = formatMs(remaining);
+                    if (remaining <= 0) {
+                        window.location.href = "@Url.Action("LogoutAll", "Home")";
+                    }
+                }
+
+                ["mousemove", "keydown", "click", "scroll", "touchstart"].forEach(function (evt) {
+                    window.addEventListener(evt, resetIdleDeadline, { passive: true });
+                });
+
+                tickIdle();
+                setInterval(tickIdle, 1000);
+            }
+
+            if (fireworkLayer) {
+                const palette = ["#3dd5f3", "#7ee081", "#ffd166", "#ff6f91", "#8d7dff", "#ff9f1c"];
+
+                function spawnFirework(clientX, clientY) {
+                    const ring = document.createElement("span");
+                    ring.className = "firework-ring";
+                    ring.style.left = (clientX - 7) + "px";
+                    ring.style.top = (clientY - 7) + "px";
+                    fireworkLayer.appendChild(ring);
+                    setTimeout(function () {
+                        ring.remove();
+                    }, 620);
+
+                    const sparks = 24;
+                    for (let i = 0; i < sparks; i += 1) {
+                        const spark = document.createElement("span");
+                        spark.className = "firework-spark";
+                        const angle = (Math.PI * 2 * i) / sparks;
+                        const distance = 40 + Math.random() * 88;
+                        spark.style.left = (clientX - 6) + "px";
+                        spark.style.top = (clientY - 6) + "px";
+                        spark.style.setProperty("--dx", Math.cos(angle) * distance + "px");
+                        spark.style.setProperty("--dy", Math.sin(angle) * distance + "px");
+                        spark.style.background = palette[Math.floor(Math.random() * palette.length)];
+                        fireworkLayer.appendChild(spark);
+                        setTimeout(function () {
+                            spark.remove();
+                        }, 1040);
+                    }
+                }
+
+                window.addEventListener("click", function (e) {
+                    if (e.button !== 0) {
+                        return;
+                    }
+                    spawnFirework(e.clientX, e.clientY);
+                }, { passive: true });
+            }
+
+            const claimsFilterInput = document.getElementById("claimsFilterInput");
+            const claimsList = document.getElementById("claimsList");
+            if (claimsFilterInput && claimsList) {
+                const claimKeys = claimsList.querySelectorAll("dt.claim-key");
+                claimsFilterInput.addEventListener("input", function () {
+                    const needle = claimsFilterInput.value.trim().toLowerCase();
+                    claimKeys.forEach(function (dt) {
+                        const dd = dt.nextElementSibling;
+                        if (!dd) {
+                            return;
+                        }
+                        const keyText = dt.textContent.toLowerCase();
+                        const valueNode = dd.querySelector(".claim-text");
+                        const valueText = valueNode ? valueNode.textContent.toLowerCase() : "";
+                        const matched = !needle || keyText.includes(needle) || valueText.includes(needle);
+                        dt.style.display = matched ? "" : "none";
+                        dd.style.display = matched ? "flex" : "none";
+                    });
+                });
+            }
+
+            document.addEventListener("click", function (e) {
+                const copyBtn = e.target.closest(".claim-copy-button");
+                if (!copyBtn) {
+                    return;
+                }
+                const text = copyBtn.getAttribute("data-claim-value") || "";
+                if (!navigator.clipboard) {
+                    return;
+                }
+                navigator.clipboard.writeText(text).then(function () {
+                    const previous = copyBtn.textContent;
+                    copyBtn.textContent = "Copied";
+                    setTimeout(function () {
+                        copyBtn.textContent = previous;
+                    }, 1000);
+                });
+            });
+        })();
+
+        async function refreshLatest() {
+            if ("caches" in window) {
+                try {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map((k) => caches.delete(k)));
+                } catch (e) {
+                    console.warn("Cache clear skipped:", e);
+                }
+            }
+            const u = new URL(window.location.href);
+            u.searchParams.set("cb", Date.now().toString());
+            window.location.href = u.toString();
+        }
+    </script>
+</body>
+</html>
